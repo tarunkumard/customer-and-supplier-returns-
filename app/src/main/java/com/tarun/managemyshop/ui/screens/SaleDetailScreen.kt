@@ -53,6 +53,14 @@ import com.tarun.managemyshop.util.CurrencyFormatter
 import com.tarun.managemyshop.util.DateRanges
 import com.tarun.managemyshop.util.InvoiceExporter
 import com.tarun.managemyshop.util.LocalCurrencyFormatter
+import com.tarun.managemyshop.data.local.entity.CustomerReturnEntity
+import com.tarun.managemyshop.domain.model.SaleReturnStatus
+import com.tarun.managemyshop.ui.components.InfoCard
+import com.tarun.managemyshop.ui.components.LabelValueRow
+import com.tarun.managemyshop.ui.components.ReturnStatusPill
+import com.tarun.managemyshop.ui.theme.extraColors
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.automirrored.filled.AssignmentReturn
 import com.tarun.managemyshop.util.ReceiptFormatter
 import com.tarun.managemyshop.util.displayName
 import com.tarun.managemyshop.viewmodel.SalesViewModel
@@ -63,9 +71,13 @@ fun SaleDetailScreen(
     saleId: Long,
     shop: ShopSettings,
     viewModel: SalesViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onCreateReturn: (Long) -> Unit,
+    onOpenReturn: (Long) -> Unit
 ) {
     val sale by remember(saleId) { viewModel.saleDetail(saleId) }.collectAsStateWithLifecycle(initialValue = null)
+    val returnSummary by remember(saleId) { viewModel.returnSummary(saleId) }.collectAsStateWithLifecycle(initialValue = null)
+    val saleReturns by remember(saleId) { viewModel.returnsForSale(saleId) }.collectAsStateWithLifecycle(initialValue = emptyList())
     val money = LocalCurrencyFormatter.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -119,7 +131,22 @@ fun SaleDetailScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            val status = returnSummary?.status ?: SaleReturnStatus.NONE
+            if (status != SaleReturnStatus.NONE) {
+                ReturnsCard(status, returnSummary?.refundMinor ?: 0, saleReturns, money, onOpenReturn)
+            }
             Receipt(shop, current, money)
+            Button(
+                onClick = { onCreateReturn(current.sale.id) },
+                enabled = status != SaleReturnStatus.FULL,
+                modifier = Modifier.fillMaxWidth().height(52.dp)
+            ) {
+                Icon(Icons.AutoMirrored.Filled.AssignmentReturn, null)
+                Text(
+                    if (status == SaleReturnStatus.FULL) "  Fully returned" else "  Create Return",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
             Button(
                 onClick = { sharePdf(current) },
                 enabled = !busy,
@@ -155,6 +182,41 @@ private fun shareReceipt(context: Context, text: String, invoiceNumber: String) 
         putExtra(Intent.EXTRA_TEXT, text)
     }
     context.startActivity(Intent.createChooser(send, "Share receipt"))
+}
+
+/** The original sale stays as it was; this card shows what has come back and been refunded since. */
+@Composable
+private fun ReturnsCard(
+    status: SaleReturnStatus,
+    refundMinor: Long,
+    returns: List<CustomerReturnEntity>,
+    money: CurrencyFormatter,
+    onOpenReturn: (Long) -> Unit
+) {
+    InfoCard {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Customer Returns", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            ReturnStatusPill(status)
+        }
+        LabelValueRow("Total refunded", money.format(refundMinor), bold = true, valueColor = MaterialTheme.extraColors.negative)
+        returns.forEach { ret ->
+            HorizontalDivider()
+            Row(
+                Modifier.fillMaxWidth().clickable { onOpenReturn(ret.id) }.padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(ret.returnNumber, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    Text(
+                        "${DateRanges.formatDateTime(ret.returnDate)} • ${ret.reason.label}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text(money.format(ret.totalRefundMinor), style = MaterialTheme.typography.bodyLarge)
+            }
+        }
+    }
 }
 
 @Composable

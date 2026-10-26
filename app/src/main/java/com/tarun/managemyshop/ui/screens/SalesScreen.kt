@@ -37,6 +37,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tarun.managemyshop.data.local.entity.SaleEntity
+import com.tarun.managemyshop.data.local.entity.SaleReturnSummary
+import com.tarun.managemyshop.ui.components.ReturnStatusPill
 import com.tarun.managemyshop.domain.model.PaymentMethod
 import com.tarun.managemyshop.ui.components.DateFilterChips
 import com.tarun.managemyshop.ui.components.EmptyState
@@ -58,6 +60,7 @@ fun SalesScreen(
     val query by viewModel.query.collectAsStateWithLifecycle()
     val payment by viewModel.paymentFilter.collectAsStateWithLifecycle()
     val dateFilter by viewModel.dateFilter.collectAsStateWithLifecycle()
+    val returnSummaries by viewModel.returnSummaries.collectAsStateWithLifecycle()
     val sales = loadedSales.orEmpty()
     val isFiltering = query.isNotBlank() || payment != null || dateFilter.preset != DatePreset.ALL
 
@@ -113,7 +116,7 @@ fun SalesScreen(
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 96.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        items(sales, key = { it.id }) { sale -> SaleRow(sale) { onOpenSale(sale.id) } }
+                        items(sales, key = { it.id }) { sale -> SaleRow(sale, returnSummaries[sale.id]) { onOpenSale(sale.id) } }
                     }
                 }
 
@@ -154,7 +157,7 @@ private fun ChipRow(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun SaleRow(sale: SaleEntity, onClick: () -> Unit) {
+private fun SaleRow(sale: SaleEntity, returnSummary: SaleReturnSummary?, onClick: () -> Unit) {
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -175,7 +178,10 @@ private fun SaleRow(sale: SaleEntity, onClick: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            MoneyText(sale.totalMinor, style = MaterialTheme.typography.titleMedium)
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                MoneyText(sale.totalMinor, style = MaterialTheme.typography.titleMedium)
+                returnSummary?.let { ReturnStatusPill(it.status) }
+            }
         }
     }
 }

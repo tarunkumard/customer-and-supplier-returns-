@@ -61,9 +61,37 @@ fun ReportsScreen(viewModel: ReportsViewModel, onBack: () -> Unit) {
             Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 ProfitCard(report.estimatedProfitMinor)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    StatCard("Total Sales", Modifier.weight(1f)) { MoneyText(report.totalSalesMinor, style = MaterialTheme.typography.titleLarge) }
+                    StatCard("Net Sales", Modifier.weight(1f)) { MoneyText(report.totalSalesMinor, style = MaterialTheme.typography.titleLarge) }
                     StatCard("Total Expenses", Modifier.weight(1f)) {
                         MoneyText(report.totalExpensesMinor, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    StatCard("Gross Sales", Modifier.weight(1f)) {
+                        MoneyText(report.grossSalesMinor, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    StatCard("Customer Refunds", Modifier.weight(1f)) {
+                        MoneyText(
+                            report.customerRefundsMinor, style = MaterialTheme.typography.titleLarge,
+                            color = if (report.customerRefundsMinor > 0) MaterialTheme.extraColors.negative else MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            "${report.customerReturnCount} return${if (report.customerReturnCount == 1) "" else "s"}",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    StatCard("Supplier Credits", Modifier.weight(1f)) {
+                        MoneyText(report.supplierCreditMinor, style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            "${report.supplierReturnCount} return${if (report.supplierReturnCount == 1) "" else "s"} to suppliers",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    StatCard("Inventory Value", Modifier.weight(1f)) {
+                        MoneyText(report.inventoryValueMinor, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
+                        Text("At purchase price, now", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -75,7 +103,7 @@ fun ReportsScreen(viewModel: ReportsViewModel, onBack: () -> Unit) {
                     }
                 }
 
-                SectionCard("Sales by payment method") {
+                SectionCard("Sales by payment method (before refunds)") {
                     if (report.paymentBreakdown.isEmpty()) {
                         EmptyNote("No sales in this period.")
                     } else {
@@ -132,8 +160,11 @@ fun ReportsScreen(viewModel: ReportsViewModel, onBack: () -> Unit) {
                     }
                 }
                 Text(
-                    "Profit = sales (excluding tax) − purchase cost of items sold − expenses. " +
-                        "Product revenue is before bill-level discounts and tax.",
+                    "Net sales = sales − customer refunds. Profit = net sales (excluding tax) − purchase cost of " +
+                        "items kept by customers (returned items reverse their cost) − expenses. " +
+                        "Supplier credits are money owed to you by wholesalers, shown separately and not included in profit. " +
+                        "Inventory value already reflects stock returned to suppliers. " +
+                        "Product revenue is before bill-level discounts, tax and refunds.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 24.dp)

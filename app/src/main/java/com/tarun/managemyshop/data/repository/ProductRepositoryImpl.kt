@@ -4,6 +4,8 @@ import androidx.room.withTransaction
 import com.tarun.managemyshop.data.local.AppDatabase
 import com.tarun.managemyshop.data.local.entity.ProductEntity
 import com.tarun.managemyshop.data.local.entity.StockAdjustmentEntity
+import com.tarun.managemyshop.data.local.entity.StockMovementEntity
+import com.tarun.managemyshop.domain.model.StockMovementType
 import com.tarun.managemyshop.domain.model.AdjustmentType
 import com.tarun.managemyshop.domain.model.DeleteResult
 import com.tarun.managemyshop.domain.model.SaveResult
@@ -16,6 +18,7 @@ class ProductRepositoryImpl(private val db: AppDatabase) : ProductRepository {
 
     private val dao = db.productDao()
     private val adjustmentDao = db.stockAdjustmentDao()
+    private val movementDao = db.stockMovementDao()
 
     override fun observeAll(): Flow<List<ProductEntity>> = dao.observeAll()
 
@@ -27,6 +30,8 @@ class ProductRepositoryImpl(private val db: AppDatabase) : ProductRepository {
 
     override fun observeAdjustments(productId: Long): Flow<List<StockAdjustmentEntity>> =
         adjustmentDao.observeForProduct(productId)
+
+    override fun observeInventoryValue(): Flow<Long> = dao.observeInventoryValue()
 
     override suspend fun getById(id: Long): ProductEntity? = dao.getById(id)
 
@@ -89,6 +94,15 @@ class ProductRepositoryImpl(private val db: AppDatabase) : ProductRepository {
                     quantityAfter = newStock.toInt(),
                     reason = reason,
                     note = note?.trim()?.ifEmpty { null },
+                    createdAt = now
+                )
+            )
+            movementDao.insert(
+                StockMovementEntity(
+                    productId = productId,
+                    movementType = if (delta > 0) StockMovementType.STOCK_INCREASE else StockMovementType.STOCK_DECREASE,
+                    quantityChange = delta,
+                    note = reason.label + (note?.trim()?.ifEmpty { null }?.let { ": $it" } ?: ""),
                     createdAt = now
                 )
             )

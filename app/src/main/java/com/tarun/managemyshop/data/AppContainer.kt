@@ -4,10 +4,12 @@ import android.content.Context
 import com.tarun.managemyshop.data.local.AppDatabase
 import com.tarun.managemyshop.data.repository.ExpenseRepositoryImpl
 import com.tarun.managemyshop.data.repository.ProductRepositoryImpl
+import com.tarun.managemyshop.data.repository.ReturnRepositoryImpl
 import com.tarun.managemyshop.data.repository.SaleRepositoryImpl
 import com.tarun.managemyshop.data.preferences.ShopSettingsRepositoryImpl
 import com.tarun.managemyshop.domain.repository.ExpenseRepository
 import com.tarun.managemyshop.domain.repository.ProductRepository
+import com.tarun.managemyshop.domain.repository.ReturnRepository
 import com.tarun.managemyshop.domain.repository.SaleRepository
 import com.tarun.managemyshop.domain.repository.ShopSettingsRepository
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +27,7 @@ class AppContainer(context: Context) {
     val settingsRepository: ShopSettingsRepository by lazy { ShopSettingsRepositoryImpl(appContext) }
     val productRepository: ProductRepository by lazy { ProductRepositoryImpl(database) }
     val saleRepository: SaleRepository by lazy { SaleRepositoryImpl(database, settingsRepository) }
+    val returnRepository: ReturnRepository by lazy { ReturnRepositoryImpl(database) }
     val expenseRepository: ExpenseRepository by lazy { ExpenseRepositoryImpl(database.expenseDao()) }
 
     val dataManager: AppDataManager by lazy { AppDataManager(database, settingsRepository) }

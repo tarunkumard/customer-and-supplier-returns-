@@ -15,7 +15,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AddShoppingCart
+import androidx.compose.material.icons.automirrored.filled.AssignmentReturn
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Payments
@@ -39,7 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tarun.managemyshop.data.local.entity.ProductEntity
-import com.tarun.managemyshop.data.local.entity.SaleEntity
+import com.tarun.managemyshop.viewmodel.ActivityItem
 import com.tarun.managemyshop.ui.components.LoadingIndicator
 import com.tarun.managemyshop.ui.components.MoneyText
 import com.tarun.managemyshop.ui.theme.extraColors
@@ -57,6 +59,8 @@ fun DashboardScreen(
     onAddProduct: () -> Unit,
     onAddExpense: () -> Unit,
     onOpenSale: (Long) -> Unit,
+    onOpenCustomerReturn: (Long) -> Unit,
+    onOpenSupplierReturn: (Long) -> Unit,
     onOpenProduct: (Long) -> Unit,
     onOpenInventory: () -> Unit
 ) {
@@ -76,8 +80,20 @@ fun DashboardScreen(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SummaryCard("Today's Sales", state.todaySalesMinor, Icons.Filled.Today, Modifier.weight(1f))
-                    SummaryCard("This Month's Sales", state.monthSalesMinor, Icons.Filled.CalendarMonth, Modifier.weight(1f))
+                    SummaryCard("Today's Net Sales", state.todaySalesMinor, Icons.Filled.Today, Modifier.weight(1f))
+                    SummaryCard("This Month's Net Sales", state.monthSalesMinor, Icons.Filled.CalendarMonth, Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SummaryCard(
+                        "Customer Refunds", state.monthRefundsMinor, Icons.AutoMirrored.Filled.AssignmentReturn,
+                        Modifier.weight(1f),
+                        valueColor = if (state.monthRefundsMinor > 0) MaterialTheme.extraColors.negative
+                        else MaterialTheme.colorScheme.onSurface
+                    )
+                    SummaryCard(
+                        "Supplier Credits", state.monthSupplierCreditMinor, Icons.Filled.LocalShipping,
+                        Modifier.weight(1f)
+                    )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     SummaryCard(
@@ -92,7 +108,9 @@ fun DashboardScreen(
                     )
                 }
                 Text(
-                    "Profit = this month's sales (excl. tax) − cost of items sold − expenses",
+                    "Net sales = sales − customer refunds (this month for the second row). " +
+                        "Profit = net sales (excl. tax) − cost of items kept by customers − expenses. " +
+                        "Supplier credits are shown separately and are not part of profit.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -100,7 +118,7 @@ fun DashboardScreen(
         }
         item { QuickActions(onNewSale, onAddProduct, onAddExpense) }
         item { LowStockCard(state.lowStock, onOpenProduct, onOpenInventory) }
-        item { RecentSalesCard(state.recentSales, onOpenSale) }
+        item { RecentActivityCard(state.recentActivity, onOpenSale, onOpenCustomerReturn, onOpenSupplierReturn) }
     }
 }
 
@@ -242,46 +260,73 @@ private fun LowStockCard(
 }
 
 @Composable
-private fun RecentSalesCard(sales: List<SaleEntity>, onOpenSale: (Long) -> Unit) {
+private fun RecentActivityCard(
+    activity: List<ActivityItem>,
+    onOpenSale: (Long) -> Unit,
+    onOpenCustomerReturn: (Long) -> Unit,
+    onOpenSupplierReturn: (Long) -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
-            Text("Recent sales", style = MaterialTheme.typography.titleMedium)
+            Text("Recent activity", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
-            if (sales.isEmpty()) {
+            if (activity.isEmpty()) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Icon(Icons.Filled.PointOfSale, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
-                        "No sales yet. Tap New Sale to record your first one.",
+                        "No activity yet. Tap New Sale to record your first one.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 return@Column
             }
-            sales.forEachIndexed { index, sale ->
+            val negative = MaterialTheme.extraColors.negative
+            activity.forEachIndexed { index, item ->
                 if (index > 0) HorizontalDivider()
+                val (title, subtitle, amountMinor, amountColor, onClick) = when (item) {
+                    is ActivityItem.Sale -> ActivityRow(
+                        item.sale.invoiceNumber,
+                        "${DateRanges.formatDateTime(item.sale.saleDate)} • ${item.sale.paymentMethod.displayName()}",
+                        item.sale.totalMinor, MaterialTheme.extraColors.positive
+                    ) { onOpenSale(item.sale.id) }
+                    is ActivityItem.CustomerReturn -> ActivityRow(
+                        "Customer Return ${item.customerReturn.returnNumber}",
+                        "${DateRanges.formatDateTime(item.customerReturn.returnDate)} • Refund Amount",
+                        -item.customerReturn.totalRefundMinor, negative
+                    ) { onOpenCustomerReturn(item.customerReturn.id) }
+                    is ActivityItem.SupplierReturn -> ActivityRow(
+                        "Return to Supplier ${item.supplierReturn.returnNumber}",
+                        "${DateRanges.formatDateTime(item.supplierReturn.returnDate)} • Supplier Credit",
+                        item.supplierReturn.totalSupplierCreditMinor, MaterialTheme.colorScheme.primary
+                    ) { onOpenSupplierReturn(item.supplierReturn.id) }
+                }
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clickable { onOpenSale(sale.id) }
+                        .clickable(onClick = onClick)
                         .padding(vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text(sale.invoiceNumber, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                        Text(
-                            "${DateRanges.formatDateTime(sale.saleDate)} • ${sale.paymentMethod.displayName()}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    MoneyText(sale.totalMinor)
+                    MoneyText(amountMinor, color = amountColor)
                 }
             }
         }
     }
 }
+
+private data class ActivityRow(
+    val title: String,
+    val subtitle: String,
+    val amountMinor: Long,
+    val amountColor: Color,
+    val onClick: () -> Unit
+)

@@ -9,6 +9,7 @@ import com.tarun.managemyshop.data.local.entity.ProductEntity
 import com.tarun.managemyshop.data.preferences.ShopSettingsRepositoryImpl
 import com.tarun.managemyshop.data.repository.ExpenseRepositoryImpl
 import com.tarun.managemyshop.data.repository.ProductRepositoryImpl
+import com.tarun.managemyshop.data.repository.ReturnRepositoryImpl
 import com.tarun.managemyshop.data.repository.SaleRepositoryImpl
 import com.tarun.managemyshop.domain.model.AdjustmentType
 import com.tarun.managemyshop.domain.model.Currency
@@ -242,7 +243,7 @@ class AppFlowTest {
     // ------------------------------------------------------------ dashboard & reports update live
 
     @Test fun reportsUpdateAfterSaleAndExpense() = runBlocking {
-        val reports = ReportsViewModel(sales, expenses, products)
+        val reports = ReportsViewModel(sales, expenses, products, ReturnRepositoryImpl(db))
         withTimeout(10_000) {
             assertEquals(0, reports.state.first { it.loaded }.saleCount)
 
@@ -265,7 +266,7 @@ class AppFlowTest {
     }
 
     @Test fun dashboardUpdatesAfterSaleAndExpense() = runBlocking {
-        val dashboard = DashboardViewModel(settings, sales, expenses, products)
+        val dashboard = DashboardViewModel(settings, sales, expenses, products, ReturnRepositoryImpl(db))
         withTimeout(10_000) {
             val id = addProduct(price = 2_000, cost = 1_500, stock = 6)
             dashboard.state.first { it.loaded && it.lowStock.isEmpty() }
@@ -273,7 +274,7 @@ class AppFlowTest {
             sales.recordSale(SaleDraft(listOf(SaleLine(id, 3))))   // leaves 3, below the default threshold of 5
             // The dashboard combines several live queries, so wait until they have all caught up.
             val afterSale = dashboard.state.first {
-                it.recentSales.size == 1 && it.todaySalesMinor == 6_000L && it.monthSalesMinor == 6_000L && it.lowStock.isNotEmpty()
+                it.recentActivity.size == 1 && it.todaySalesMinor == 6_000L && it.monthSalesMinor == 6_000L && it.lowStock.isNotEmpty()
             }
             assertEquals(6_000, afterSale.todaySalesMinor)
             assertEquals(6_000, afterSale.monthSalesMinor)

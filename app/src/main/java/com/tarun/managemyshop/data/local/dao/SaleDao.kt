@@ -22,6 +22,10 @@ interface SaleDao {
     @Query("SELECT * FROM sales WHERE id = :id")
     fun observe(id: Long): Flow<SaleWithItems?>
 
+    @Transaction
+    @Query("SELECT * FROM sales WHERE id = :id")
+    suspend fun getWithItems(id: Long): SaleWithItems?
+
     @Query("SELECT COALESCE(SUM(totalMinor), 0) FROM sales WHERE saleDate >= :start AND saleDate < :end")
     fun observeTotalBetween(start: Long, end: Long): Flow<Long>
 

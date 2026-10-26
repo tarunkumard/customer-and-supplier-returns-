@@ -6,6 +6,8 @@ import com.tarun.managemyshop.data.local.entity.PaymentBreakdownRow
 import com.tarun.managemyshop.data.local.entity.SaleEntity
 import com.tarun.managemyshop.data.local.entity.SaleItemEntity
 import com.tarun.managemyshop.data.local.entity.SaleSummary
+import com.tarun.managemyshop.data.local.entity.StockMovementEntity
+import com.tarun.managemyshop.domain.model.StockMovementType
 import com.tarun.managemyshop.data.local.entity.SaleWithItems
 import com.tarun.managemyshop.data.local.entity.TopProductRow
 import com.tarun.managemyshop.domain.calc.InvoiceNumber
@@ -25,6 +27,7 @@ class SaleRepositoryImpl(
 
     private val saleDao = db.saleDao()
     private val productDao = db.productDao()
+    private val movementDao = db.stockMovementDao()
 
     override fun observe(id: Long): Flow<SaleWithItems?> = saleDao.observe(id)
 
@@ -105,6 +108,18 @@ class SaleRepositoryImpl(
                     "Stock changed while recording sale"
                 }
             }
+            movementDao.insertAll(
+                items.map {
+                    StockMovementEntity(
+                        productId = it.productId,
+                        movementType = StockMovementType.SALE,
+                        quantityChange = -it.quantity,
+                        referenceId = saleId,
+                        note = "Sale $invoiceNumber",
+                        createdAt = now
+                    )
+                }
+            )
             SaveResult.Success(saleId)
         }
     }

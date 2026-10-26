@@ -45,5 +45,76 @@ object Migrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+    /** v4: customer / supplier returns and the stock movement ledger (existing sales are back-filled). */
+    val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `customer_returns` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `returnNumber` TEXT NOT NULL, " +
+                    "`originalSaleId` INTEGER NOT NULL, `originalInvoiceNumber` TEXT NOT NULL, " +
+                    "`returnDate` INTEGER NOT NULL, `customerName` TEXT, `refundMethod` TEXT NOT NULL, " +
+                    "`reason` TEXT NOT NULL, `notes` TEXT, `subtotalRefundMinor` INTEGER NOT NULL, " +
+                    "`taxRefundMinor` INTEGER NOT NULL, `totalRefundMinor` INTEGER NOT NULL)"
+            )
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_customer_returns_returnNumber` ON `customer_returns` (`returnNumber`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_customer_returns_originalSaleId` ON `customer_returns` (`originalSaleId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_customer_returns_returnDate` ON `customer_returns` (`returnDate`)")
+
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `customer_return_items` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `customerReturnId` INTEGER NOT NULL, " +
+                    "`originalSaleItemId` INTEGER NOT NULL, `productId` INTEGER NOT NULL, " +
+                    "`productNameSnapshot` TEXT NOT NULL, `quantityReturned` INTEGER NOT NULL, " +
+                    "`unitPriceMinor` INTEGER NOT NULL, `unitCostMinor` INTEGER NOT NULL, " +
+                    "`lineRefundMinor` INTEGER NOT NULL, " +
+                    "FOREIGN KEY(`customerReturnId`) REFERENCES `customer_returns`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )"
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_customer_return_items_customerReturnId` ON `customer_return_items` (`customerReturnId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_customer_return_items_originalSaleItemId` ON `customer_return_items` (`originalSaleItemId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_customer_return_items_productId` ON `customer_return_items` (`productId`)")
+
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `supplier_returns` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `returnNumber` TEXT NOT NULL, " +
+                    "`returnDate` INTEGER NOT NULL, `supplierName` TEXT, `reason` TEXT NOT NULL, " +
+                    "`notes` TEXT, `totalSupplierCreditMinor` INTEGER NOT NULL)"
+            )
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_supplier_returns_returnNumber` ON `supplier_returns` (`returnNumber`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_supplier_returns_returnDate` ON `supplier_returns` (`returnDate`)")
+
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `supplier_return_items` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `supplierReturnId` INTEGER NOT NULL, " +
+                    "`productId` INTEGER NOT NULL, `productNameSnapshot` TEXT NOT NULL, " +
+                    "`quantityReturned` INTEGER NOT NULL, `unitCostMinor` INTEGER NOT NULL, " +
+                    "`lineSupplierCreditMinor` INTEGER NOT NULL, " +
+                    "FOREIGN KEY(`supplierReturnId`) REFERENCES `supplier_returns`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )"
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_supplier_return_items_supplierReturnId` ON `supplier_return_items` (`supplierReturnId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_supplier_return_items_productId` ON `supplier_return_items` (`productId`)")
+
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `stock_movements` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `productId` INTEGER NOT NULL, " +
+                    "`movementType` TEXT NOT NULL, `quantityChange` INTEGER NOT NULL, `referenceId` INTEGER, " +
+                    "`note` TEXT, `createdAt` INTEGER NOT NULL)"
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_stock_movements_productId` ON `stock_movements` (`productId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_stock_movements_createdAt` ON `stock_movements` (`createdAt`)")
+
+            // Back-fill the ledger with past sales and manual adjustments so it is complete from day one.
+            db.execSQL(
+                "INSERT INTO `stock_movements` (`productId`, `movementType`, `quantityChange`, `referenceId`, `note`, `createdAt`) " +
+                    "SELECT i.`productId`, 'SALE', -i.`quantity`, s.`id`, 'Sale ' || s.`invoiceNumber`, s.`saleDate` " +
+                    "FROM `sale_items` i JOIN `sales` s ON s.`id` = i.`saleId`"
+            )
+            db.execSQL(
+                "INSERT INTO `stock_movements` (`productId`, `movementType`, `quantityChange`, `referenceId`, `note`, `createdAt`) " +
+                    "SELECT `productId`, CASE WHEN `delta` >= 0 THEN 'STOCK_INCREASE' ELSE 'STOCK_DECREASE' END, " +
+                    "`delta`, `id`, `reason`, `createdAt` FROM `stock_adjustments`"
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
 }

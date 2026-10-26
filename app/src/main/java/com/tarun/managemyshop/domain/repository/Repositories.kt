@@ -1,6 +1,14 @@
 package com.tarun.managemyshop.domain.repository
 
+import com.tarun.managemyshop.data.local.entity.CustomerReturnEntity
+import com.tarun.managemyshop.data.local.entity.CustomerReturnWithItems
 import com.tarun.managemyshop.data.local.entity.ExpenseEntity
+import com.tarun.managemyshop.data.local.entity.RefundSummary
+import com.tarun.managemyshop.data.local.entity.ReturnedQuantityRow
+import com.tarun.managemyshop.data.local.entity.SaleReturnSummary
+import com.tarun.managemyshop.data.local.entity.SupplierCreditSummary
+import com.tarun.managemyshop.data.local.entity.SupplierReturnEntity
+import com.tarun.managemyshop.data.local.entity.SupplierReturnWithItems
 import com.tarun.managemyshop.data.local.entity.ProductEntity
 import com.tarun.managemyshop.data.local.entity.PaymentBreakdownRow
 import com.tarun.managemyshop.data.local.entity.SaleEntity
@@ -10,6 +18,10 @@ import com.tarun.managemyshop.data.local.entity.StockAdjustmentEntity
 import com.tarun.managemyshop.data.local.entity.TopProductRow
 import com.tarun.managemyshop.domain.model.AdjustmentType
 import com.tarun.managemyshop.domain.model.Currency
+import com.tarun.managemyshop.domain.model.CustomerReturnDraft
+import com.tarun.managemyshop.domain.model.CustomerReturnReason
+import com.tarun.managemyshop.domain.model.SupplierReturnDraft
+import com.tarun.managemyshop.domain.model.SupplierReturnReason
 import com.tarun.managemyshop.domain.model.DeleteResult
 import com.tarun.managemyshop.domain.model.PaymentMethod
 import com.tarun.managemyshop.domain.model.SaleDraft
@@ -24,6 +36,7 @@ interface ProductRepository {
     fun observeLowStock(): Flow<List<ProductEntity>>
     fun observe(id: Long): Flow<ProductEntity?>
     fun observeAdjustments(productId: Long): Flow<List<StockAdjustmentEntity>>
+    fun observeInventoryValue(): Flow<Long>
     suspend fun getById(id: Long): ProductEntity?
 
     /** Inserts when `id == 0`, otherwise updates. Timestamps are managed here. */
@@ -64,6 +77,60 @@ interface SaleRepository {
      * Fails with [SaveResult.Invalid] (and writes nothing) if stock is insufficient.
      */
     suspend fun recordSale(draft: SaleDraft): SaveResult<Long>
+}
+
+interface ReturnRepository {
+    // ---- customer returns ----
+    fun observeCustomerReturns(
+        query: String,
+        start: Long,
+        end: Long,
+        reason: CustomerReturnReason?
+    ): Flow<List<CustomerReturnEntity>>
+
+    fun observeCustomerReturn(id: Long): Flow<CustomerReturnWithItems?>
+    fun observeCustomerReturnsForSale(saleId: Long): Flow<List<CustomerReturnEntity>>
+    fun observeRecentCustomerReturns(limit: Int): Flow<List<CustomerReturnEntity>>
+
+    /** Units of each line of the sale that customers have already returned. */
+    fun observeReturnedQuantities(saleId: Long): Flow<List<ReturnedQuantityRow>>
+
+    /** Return status of every sale that has at least one return (sales without returns are absent). */
+    fun observeReturnedSaleSummaries(): Flow<List<SaleReturnSummary>>
+    fun observeSaleSummary(saleId: Long): Flow<SaleReturnSummary?>
+
+    /** Customer refunds in the period, plus the cost of goods sold they reverse. */
+    fun observeRefundSummary(start: Long, end: Long): Flow<RefundSummary>
+
+    /** The number the next customer return will get, e.g. `CR-20261026-0001` (shown as a preview). */
+    suspend fun nextCustomerReturnNumber(): String
+
+    /**
+     * In ONE transaction: saves the return and its lines, restores stock, writes stock movements.
+     * Never touches the original sale. Fails with [SaveResult.Invalid] (writing nothing) if any
+     * quantity exceeds what is still returnable.
+     */
+    suspend fun createCustomerReturn(draft: CustomerReturnDraft): SaveResult<Long>
+
+    // ---- supplier returns ----
+    fun observeSupplierReturns(
+        query: String,
+        start: Long,
+        end: Long,
+        reason: SupplierReturnReason?
+    ): Flow<List<SupplierReturnEntity>>
+
+    fun observeSupplierReturn(id: Long): Flow<SupplierReturnWithItems?>
+    fun observeRecentSupplierReturns(limit: Int): Flow<List<SupplierReturnEntity>>
+    fun observeSupplierCreditSummary(start: Long, end: Long): Flow<SupplierCreditSummary>
+    suspend fun nextSupplierReturnNumber(): String
+
+    /**
+     * In ONE transaction: saves the return and its lines, deducts stock, writes negative stock
+     * movements and records the supplier credit. Fails with [SaveResult.Invalid] (writing nothing)
+     * if a quantity exceeds the stock on hand.
+     */
+    suspend fun createSupplierReturn(draft: SupplierReturnDraft): SaveResult<Long>
 }
 
 interface ExpenseRepository {

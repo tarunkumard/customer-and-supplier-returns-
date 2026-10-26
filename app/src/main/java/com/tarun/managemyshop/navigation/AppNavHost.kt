@@ -23,18 +23,24 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.tarun.managemyshop.domain.model.ShopSettings
 import com.tarun.managemyshop.ui.components.AppTopBar
+import com.tarun.managemyshop.ui.screens.CustomerReturnDetailScreen
+import com.tarun.managemyshop.ui.screens.CustomerReturnsScreen
 import com.tarun.managemyshop.ui.screens.DashboardScreen
 import com.tarun.managemyshop.ui.screens.ExpenseFormScreen
 import com.tarun.managemyshop.ui.screens.ExpensesScreen
 import com.tarun.managemyshop.ui.screens.InventoryScreen
 import com.tarun.managemyshop.ui.screens.MoreScreen
+import com.tarun.managemyshop.ui.screens.NewCustomerReturnScreen
 import com.tarun.managemyshop.ui.screens.NewSaleScreen
+import com.tarun.managemyshop.ui.screens.NewSupplierReturnScreen
 import com.tarun.managemyshop.ui.screens.ProductDetailScreen
 import com.tarun.managemyshop.ui.screens.ProductFormScreen
 import com.tarun.managemyshop.ui.screens.ReportsScreen
 import com.tarun.managemyshop.ui.screens.SaleDetailScreen
 import com.tarun.managemyshop.ui.screens.SalesScreen
 import com.tarun.managemyshop.ui.screens.SettingsScreen
+import com.tarun.managemyshop.ui.screens.SupplierReturnDetailScreen
+import com.tarun.managemyshop.ui.screens.SupplierReturnsScreen
 
 @Composable
 fun AppNavHost(
@@ -75,6 +81,8 @@ fun AppNavHost(
                     viewModel = viewModel(factory = viewModelFactory),
                     onNewSale = { navController.navigate(Routes.SALE_NEW) },
                     onOpenSale = { navController.navigate(Routes.saleDetail(it)) },
+                    onOpenCustomerReturn = { navController.navigate(Routes.customerReturnDetail(it)) },
+                    onOpenSupplierReturn = { navController.navigate(Routes.supplierReturnDetail(it)) },
                     onAddProduct = { navController.navigate(Routes.PRODUCT_NEW) },
                     onAddExpense = { navController.navigate(Routes.EXPENSE_NEW) },
                     onOpenProduct = { navController.navigate(Routes.productDetail(it)) },
@@ -104,6 +112,8 @@ fun AppNavHost(
             }
             composable(Destination.More.route) {
                 MoreScreen(
+                    onOpenCustomerReturns = { navController.navigate(Routes.CUSTOMER_RETURNS) },
+                    onOpenSupplierReturns = { navController.navigate(Routes.SUPPLIER_RETURNS) },
                     onOpenReports = { navController.navigate(Routes.REPORTS) },
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) }
                 )
@@ -155,6 +165,73 @@ fun AppNavHost(
             ) { entry ->
                 SaleDetailScreen(
                     saleId = entry.arguments!!.getLong(Routes.SALE_ID),
+                    shop = settings,
+                    viewModel = viewModel(factory = viewModelFactory),
+                    onBack = { navController.popBackStack() },
+                    onCreateReturn = { navController.navigate(Routes.customerReturnNew(it)) },
+                    onOpenReturn = { navController.navigate(Routes.customerReturnDetail(it)) }
+                )
+            }
+            composable(Routes.CUSTOMER_RETURNS) {
+                CustomerReturnsScreen(
+                    viewModel = viewModel(factory = viewModelFactory),
+                    onBack = { navController.popBackStack() },
+                    onOpenReturn = { navController.navigate(Routes.customerReturnDetail(it)) },
+                    onCreateReturnForSale = { navController.navigate(Routes.customerReturnNew(it)) }
+                )
+            }
+            composable(
+                Routes.CUSTOMER_RETURN_NEW,
+                arguments = listOf(navArgument(Routes.SALE_ID) { type = NavType.LongType })
+            ) { entry ->
+                NewCustomerReturnScreen(
+                    saleId = entry.arguments!!.getLong(Routes.SALE_ID),
+                    viewModel = viewModel(factory = viewModelFactory),
+                    onBack = { navController.popBackStack() },
+                    onCreated = { id ->
+                        navController.navigate(Routes.customerReturnDetail(id)) {
+                            popUpTo(Routes.CUSTOMER_RETURN_NEW) { inclusive = true }
+                        }
+                    }
+                )
+            }
+            composable(
+                Routes.CUSTOMER_RETURN_DETAIL,
+                arguments = listOf(navArgument(Routes.RETURN_ID) { type = NavType.LongType })
+            ) { entry ->
+                CustomerReturnDetailScreen(
+                    returnId = entry.arguments!!.getLong(Routes.RETURN_ID),
+                    shop = settings,
+                    viewModel = viewModel(factory = viewModelFactory),
+                    onBack = { navController.popBackStack() },
+                    onOpenSale = { navController.navigate(Routes.saleDetail(it)) }
+                )
+            }
+            composable(Routes.SUPPLIER_RETURNS) {
+                SupplierReturnsScreen(
+                    viewModel = viewModel(factory = viewModelFactory),
+                    onBack = { navController.popBackStack() },
+                    onOpenReturn = { navController.navigate(Routes.supplierReturnDetail(it)) },
+                    onNewReturn = { navController.navigate(Routes.SUPPLIER_RETURN_NEW) }
+                )
+            }
+            composable(Routes.SUPPLIER_RETURN_NEW) {
+                NewSupplierReturnScreen(
+                    viewModel = viewModel(factory = viewModelFactory),
+                    onBack = { navController.popBackStack() },
+                    onCreated = { id ->
+                        navController.navigate(Routes.supplierReturnDetail(id)) {
+                            popUpTo(Routes.SUPPLIER_RETURN_NEW) { inclusive = true }
+                        }
+                    }
+                )
+            }
+            composable(
+                Routes.SUPPLIER_RETURN_DETAIL,
+                arguments = listOf(navArgument(Routes.RETURN_ID) { type = NavType.LongType })
+            ) { entry ->
+                SupplierReturnDetailScreen(
+                    returnId = entry.arguments!!.getLong(Routes.RETURN_ID),
                     shop = settings,
                     viewModel = viewModel(factory = viewModelFactory),
                     onBack = { navController.popBackStack() }

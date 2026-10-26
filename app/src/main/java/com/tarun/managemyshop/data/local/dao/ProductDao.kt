@@ -54,4 +54,12 @@ interface ProductDao {
             "WHERE id = :id AND stockQuantity >= :quantity"
     )
     suspend fun decrementStock(id: Long, quantity: Int, now: Long): Int
+
+    /** Adds returned units back to stock; returns 0 rows if the product no longer exists. */
+    @Query("UPDATE products SET stockQuantity = stockQuantity + :quantity, updatedAt = :now WHERE id = :id")
+    suspend fun incrementStock(id: Long, quantity: Int, now: Long): Int
+
+    /** Stock on hand valued at purchase price. */
+    @Query("SELECT COALESCE(SUM(stockQuantity * purchasePriceMinor), 0) FROM products")
+    fun observeInventoryValue(): Flow<Long>
 }
