@@ -1,6 +1,7 @@
 package com.tarun.managemyshop.data
 
 import android.content.Context
+import com.tarun.managemyshop.BuildConfig
 import com.tarun.managemyshop.data.local.AppDatabase
 import com.tarun.managemyshop.data.repository.ExpenseRepositoryImpl
 import com.tarun.managemyshop.data.repository.ProductRepositoryImpl
@@ -33,6 +34,9 @@ class AppContainer(context: Context) {
     val dataManager: AppDataManager by lazy { AppDataManager(database, settingsRepository) }
 
     fun initialize() {
-        appScope.launch { DatabaseSeeder.seedIfNeeded(database, settingsRepository) }
+        // Sample products exist for development only; a real user starts with an empty shop.
+        if (BuildConfig.SEED_SAMPLE_DATA) {
+            appScope.launch { DatabaseSeeder.seedIfNeeded(database, settingsRepository) }
+        }
     }
 }

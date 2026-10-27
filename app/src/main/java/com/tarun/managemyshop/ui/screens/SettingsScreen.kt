@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -63,7 +64,7 @@ import kotlinx.coroutines.launch
 private const val CONFIRM_WORD = "DELETE"
 
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
+fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit, onOpenPrivacy: () -> Unit) {
     var loaded by rememberSaveable { mutableStateOf(false) }
     var shopName by rememberSaveable { mutableStateOf("") }
     var address by rememberSaveable { mutableStateOf("") }
@@ -187,6 +188,10 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
 
             SectionTitle("About")
             AboutCard()
+            OutlinedButton(onClick = onOpenPrivacy, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.PrivacyTip, null)
+                Text("  Privacy Policy")
+            }
 
             SectionTitle("Danger zone")
             OutlinedButton(

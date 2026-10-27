@@ -10,6 +10,7 @@ import com.tarun.managemyshop.domain.model.SupplierReturnReason
 import com.tarun.managemyshop.domain.repository.ProductRepository
 import com.tarun.managemyshop.domain.repository.ReturnRepository
 import com.tarun.managemyshop.util.Money
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -109,17 +110,25 @@ class NewSupplierReturnViewModel(
 
     fun confirm() {
         val s = _state.value
-        if (s.saving || !s.isValid) return
-        _state.update { it.copy(saving = true, error = null) }
+        if (s.saving || s.createdReturnId != null || !s.isValid) return
+        // Claim the save atomically so a rapid second tap cannot record the return twice.
+        if (!_state.compareAndSet(s, s.copy(saving = true, error = null))) return
         viewModelScope.launch {
-            val result = returns.createSupplierReturn(
-                SupplierReturnDraft(
-                    supplierName = s.supplierName,
-                    reason = s.reason,
-                    notes = s.notes,
-                    lines = s.lines.map { SupplierReturnLine(it.productId, it.quantity!!, it.unitCostMinor!!) }
+            val result = try {
+                returns.createSupplierReturn(
+                    SupplierReturnDraft(
+                        supplierName = s.supplierName,
+                        reason = s.reason,
+                        notes = s.notes,
+                        lines = s.lines.map { SupplierReturnLine(it.productId, it.quantity!!, it.unitCostMinor!!) }
+                    )
                 )
-            )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // The transaction rolled back, so nothing was saved; let the user try again.
+                SaveResult.Invalid(mapOf("save" to "Couldn't save the return. Nothing was changed. Please try again."))
+            }
             _state.update {
                 when (result) {
                     is SaveResult.Success -> it.copy(saving = false, createdReturnId = result.value)

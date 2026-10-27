@@ -33,6 +33,7 @@ import com.tarun.managemyshop.ui.screens.MoreScreen
 import com.tarun.managemyshop.ui.screens.NewCustomerReturnScreen
 import com.tarun.managemyshop.ui.screens.NewSaleScreen
 import com.tarun.managemyshop.ui.screens.NewSupplierReturnScreen
+import com.tarun.managemyshop.ui.screens.PrivacyPolicyScreen
 import com.tarun.managemyshop.ui.screens.ProductDetailScreen
 import com.tarun.managemyshop.ui.screens.ProductFormScreen
 import com.tarun.managemyshop.ui.screens.ReportsScreen
@@ -145,8 +146,12 @@ fun AppNavHost(
             composable(Routes.SETTINGS) {
                 SettingsScreen(
                     viewModel = viewModel(factory = viewModelFactory),
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onOpenPrivacy = { navController.navigate(Routes.PRIVACY) }
                 )
+            }
+            composable(Routes.PRIVACY) {
+                PrivacyPolicyScreen(onBack = { navController.popBackStack() })
             }
             composable(Routes.SALE_NEW) {
                 NewSaleScreen(

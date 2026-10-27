@@ -11,6 +11,7 @@ import com.tarun.managemyshop.domain.model.PaymentMethod
 import com.tarun.managemyshop.domain.model.SaveResult
 import com.tarun.managemyshop.domain.repository.ReturnRepository
 import com.tarun.managemyshop.domain.repository.SaleRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -145,19 +146,30 @@ class NewCustomerReturnViewModel(
     fun confirm() {
         val current = state.value
         val sale = current.sale ?: return
-        if (current.saving || current.unitsSelected == 0) return
-        form.update { it.copy(saving = true, error = null) }
+        if (current.unitsSelected == 0) return
+        // Claim the save atomically on the form itself: the derived [state] can lag a rapid
+        // second tap, which would otherwise record the same return twice.
+        val before = form.value
+        if (before.saving || before.createdReturnId != null) return
+        if (!form.compareAndSet(before, before.copy(saving = true, error = null))) return
         viewModelScope.launch {
-            val result = returns.createCustomerReturn(
-                CustomerReturnDraft(
-                    originalSaleId = sale.sale.id,
-                    customerName = current.customerName,
-                    refundMethod = current.refundMethod,
-                    reason = current.reason,
-                    notes = current.notes,
-                    lines = current.lines.filter { it.quantity > 0 }.map { CustomerReturnLine(it.saleItemId, it.quantity) }
+            val result = try {
+                returns.createCustomerReturn(
+                    CustomerReturnDraft(
+                        originalSaleId = sale.sale.id,
+                        customerName = current.customerName,
+                        refundMethod = current.refundMethod,
+                        reason = current.reason,
+                        notes = current.notes,
+                        lines = current.lines.filter { it.quantity > 0 }.map { CustomerReturnLine(it.saleItemId, it.quantity) }
+                    )
                 )
-            )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // The transaction rolled back, so nothing was saved; let the user try again.
+                SaveResult.Invalid(mapOf("save" to "Couldn't save the return. Nothing was changed. Please try again."))
+            }
             form.update {
                 when (result) {
                     is SaveResult.Success -> it.copy(saving = false, createdReturnId = result.value)

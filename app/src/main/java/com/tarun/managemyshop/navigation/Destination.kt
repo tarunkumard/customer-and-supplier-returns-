@@ -44,6 +44,7 @@ object Routes {
 
     const val REPORTS = "reports"
     const val SETTINGS = "settings"
+    const val PRIVACY = "privacy"
 
     fun customerReturnNew(saleId: Long) = "returns/customer/new/$saleId"
     fun customerReturnDetail(id: Long) = "returns/customer/$id"
